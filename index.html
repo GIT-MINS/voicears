@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visible ARS Voice Test</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f7f6; }
+        #result-box { width: 90%; min-height: 150px; margin: 20px auto; padding: 15px; border-radius: 10px; background: #fff; border: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-size: 1.2rem; }
+        .btn { padding: 15px 30px; font-size: 1rem; color: white; border: none; border-radius: 50px; cursor: pointer; transition: 0.3s; }
+        #start-btn { background-color: #4CAF50; }
+        #start-btn.recording { background-color: #f44336; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        .status { margin-top: 10px; color: #666; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <h2>보이는 ARS 음성 인식</h2>
+    <div id="result-box">아래 버튼을 누르고 말씀하세요...</div>
+    <button id="start-btn" class="btn">음성 인식 시작</button>
+    <p id="status-text" class="status">대기 중</p>
+
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const resultBox = document.getElementById('result-box');
+        const statusText = document.getElementById('status-text');
+
+        // 브라우저 호환성 체크
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+            resultBox.innerText = "이 브라우저는 음성 인식을 지원하지 않습니다. 크롬을 사용해 주세요.";
+            startBtn.disabled = true;
+        } else {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'ko-KR';
+            recognition.interimResults = true; // 말하는 도중에도 결과 표시
+            recognition.continuous = false;   // 한 문장이 끝나면 중지
+
+            let isRecording = false;
+
+            startBtn.onclick = () => {
+                if (!isRecording) {
+                    recognition.start();
+                } else {
+                    recognition.stop();
+                }
+            };
+
+            recognition.onstart = () => {
+                isRecording = true;
+                startBtn.innerText = "인식 중... (멈추려면 클릭)";
+                startBtn.classList.add('recording');
+                statusText.innerText = "마이크 활성화됨";
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                
+                // 실시간으로 결과 출력
+                resultBox.innerHTML = `<strong>최종:</strong> ${finalTranscript}<br><span style="color:#999">인식중: ${interimTranscript}</span>`;
+                
+                if (finalTranscript) {
+                    console.log("서버로 전송할 값:", finalTranscript);
+                    // 여기서 fetch 등을 이용해 ARS 서버로 전송 가능
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error("오류 발생:", event.error);
+                statusText.innerText = "오류: " + event.error;
+                stopRecording();
+            };
+
+            recognition.onend = () => {
+                stopRecording();
+            };
+
+            function stopRecording() {
+                isRecording = false;
+                startBtn.innerText = "음성 인식 시작";
+                startBtn.classList.remove('recording');
+                statusText.innerText = "인식 종료";
+            }
+        }
+    </script>
+</body>
+</html>
