@@ -17,6 +17,10 @@
         .mic-indicator { width: 60px; height: 60px; border-radius: 50%; background: #ff4757; display: inline-flex; justify-content: center; align-items: center; margin-bottom: 10px; transition: 0.3s; }
         .recording { animation: pulse 1.5s infinite; }
         
+        /* 중지 버튼 스타일 */
+        #stop-btn { padding: 12px 25px; font-size: 1rem; color: white; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; transition: background 0.3s; }
+        #stop-btn.active { background: #007bff; }
+
         @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); } 70% { transform: scale(1.1); box-shadow: 0 0 0 15px rgba(255, 71, 87, 0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); } }
         .guide-text { color: #6c757d; font-size: 1rem; margin-top: 15px; }
     </style>
@@ -38,11 +42,13 @@
             <span id="transcript-interim" style="color: #adb5bd;">듣고 있습니다...</span>
         </div>
         <p id="status-text" class="guide-text">무엇을 도와드릴까요? 상담 내용을 말씀하세요.</p>
+        
+        <button id="stop-btn">인식 일시 중지</button>
     </div>
 
     <script>
-        // 1. 변수 선언 (DOM 참조 추가)
         const entryBtn = document.getElementById('entry-btn');
+        const stopBtn = document.getElementById('stop-btn');
         const welcomeLayer = document.getElementById('welcome-layer');
         const arsScreen = document.getElementById('ars-screen');
         const micIcon = document.getElementById('mic-icon');
@@ -50,7 +56,6 @@
         const transcriptInterim = document.getElementById('transcript-interim');
         const statusText = document.getElementById('status-text');
 
-        // 2. 크롬 호환성을 위한 접두사 처리
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         if (!SpeechRecognition) {
@@ -63,11 +68,29 @@
 
             let isManualStop = false;
 
+            // 서비스 시작
             entryBtn.onclick = () => {
                 welcomeLayer.style.display = 'none';
                 arsScreen.style.display = 'block';
                 isManualStop = false;
                 recognition.start(); 
+            };
+
+            // 중지 및 재개 버튼 로직
+            stopBtn.onclick = () => {
+                if (!isManualStop) {
+                    // 중지 시 실행
+                    isManualStop = true;
+                    recognition.stop();
+                    stopBtn.innerText = "다시 대화하기";
+                    stopBtn.classList.add('active');
+                } else {
+                    // 재개 시 실행
+                    isManualStop = false;
+                    recognition.start();
+                    stopBtn.innerText = "인식 일시 중지";
+                    stopBtn.classList.remove('active');
+                }
             };
 
             recognition.onstart = () => {
@@ -94,6 +117,7 @@
             };
 
             recognition.onend = () => {
+                // 사용자가 직접 멈춘 게 아닐 때만 재시작
                 if (!isManualStop) {
                     console.log("재시작 시도...");
                     setTimeout(() => {
@@ -104,7 +128,7 @@
                         }
                     }, 300);
                 } else {
-                    stopRecording();
+                    stopRecordingUI();
                 }
             };
 
@@ -116,11 +140,11 @@
                 if (event.error === 'not-allowed') {
                     alert("마이크 권한이 거부되었습니다.");
                     isManualStop = true;
-                    stopRecording();
+                    stopRecordingUI();
                 }
             };
 
-            function stopRecording() {
+            function stopRecordingUI() {
                 micIcon.classList.remove('recording');
                 statusText.innerText = "인식 중지됨";
             }
