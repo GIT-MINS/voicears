@@ -8,11 +8,9 @@
         body { font-family: 'Pretendard', sans-serif; text-align: center; padding: 0; margin: 0; background: #f8f9fa; }
         .container { max-width: 500px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         
-        /* 시작 레이어 */
         #welcome-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .start-btn { padding: 20px 40px; font-size: 1.5rem; font-weight: bold; color: white; background: #007bff; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,123,255,0.3); }
         
-        /* 메인 ARS 화면 */
         #ars-screen { display: none; width: 100%; }
         #result-box { width: 100%; min-height: 200px; margin-bottom: 20px; padding: 20px; border-radius: 15px; background: #fff; border: 2px solid #e9ecef; box-shadow: 0 10px 25px rgba(0,0,0,0.05); font-size: 1.3rem; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }
         
@@ -43,59 +41,90 @@
     </div>
 
     <script>
-        // index.html 내 <script> 부분을 아래로 교체해 보세요.
+        // 1. 변수 선언 (DOM 참조 추가)
+        const entryBtn = document.getElementById('entry-btn');
+        const welcomeLayer = document.getElementById('welcome-layer');
+        const arsScreen = document.getElementById('ars-screen');
+        const micIcon = document.getElementById('mic-icon');
+        const transcriptFinal = document.getElementById('transcript-final');
+        const transcriptInterim = document.getElementById('transcript-interim');
+        const statusText = document.getElementById('status-text');
 
-const recognition = new SpeechRecognition();
-recognition.lang = 'ko-KR';
-recognition.interimResults = true;
-recognition.continuous = false; 
+        // 2. 크롬 호환성을 위한 접두사 처리
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-let isManualStop = false; // 사용자가 직접 멈췄는지 확인하는 플래그
+        if (!SpeechRecognition) {
+            alert("이 브라우저는 음성 인식을 지원하지 않습니다. 안드로이드 크롬을 사용해 주세요.");
+        } else {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'ko-KR';
+            recognition.interimResults = true;
+            recognition.continuous = false; 
 
-entryBtn.onclick = () => {
-    welcomeLayer.style.display = 'none';
-    arsScreen.style.display = 'block';
-    isManualStop = false;
-    recognition.start(); 
-};
+            let isManualStop = false;
 
-// 인식 프로세스가 완전히 종료될 때 호출
-recognition.onend = () => {
-    // 사용자가 직접 멈춘 게 아니라면 무조건 재시작
-    if (!isManualStop) {
-        console.log("인식 종료됨. 0.3초 후 재시작 시도...");
-        setTimeout(() => {
-            try {
-                recognition.start();
-            } catch (e) {
-                console.log("재시작 중 오류 발생(이미 실행 중 등):", e);
+            entryBtn.onclick = () => {
+                welcomeLayer.style.display = 'none';
+                arsScreen.style.display = 'block';
+                isManualStop = false;
+                recognition.start(); 
+            };
+
+            recognition.onstart = () => {
+                micIcon.classList.add('recording');
+                statusText.innerText = "음성 인식 중...";
+            };
+
+            recognition.onresult = (event) => {
+                let interim = '';
+                let final = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        final += event.results[i][0].transcript;
+                    } else {
+                        interim += event.results[i][0].transcript;
+                    }
+                }
+                
+                if (final) {
+                    transcriptFinal.innerText = final;
+                }
+                transcriptInterim.innerText = interim;
+            };
+
+            recognition.onend = () => {
+                if (!isManualStop) {
+                    console.log("재시작 시도...");
+                    setTimeout(() => {
+                        try {
+                            recognition.start();
+                        } catch (e) {
+                            console.log("이미 실행 중:", e);
+                        }
+                    }, 300);
+                } else {
+                    stopRecording();
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error("에러 발생:", event.error);
+                if (event.error === 'no-speech') {
+                    statusText.innerText = "말씀이 없어 대기 중입니다...";
+                }
+                if (event.error === 'not-allowed') {
+                    alert("마이크 권한이 거부되었습니다.");
+                    isManualStop = true;
+                    stopRecording();
+                }
+            };
+
+            function stopRecording() {
+                micIcon.classList.remove('recording');
+                statusText.innerText = "인식 중지됨";
             }
-        }, 300); // 0.3초의 유예 시간을 주어 브라우저 충돌 방지
-    } else {
-        stopRecording();
-    }
-};
-
-// 에러 처리 보강
-recognition.onerror = (event) => {
-    console.error("발생한 에러:", event.error);
-    
-    // 'no-speech'나 'aborted'는 무시하고 계속 진행하도록 유도
-    if (event.error === 'no-speech') {
-        statusText.innerText = "말씀이 없으셔서 다시 대기합니다...";
-    }
-    if (event.error === 'not-allowed') {
-        alert("마이크 권한이 필요합니다.");
-        isManualStop = true;
-        stopRecording();
-    }
-};
-
-function stopRecording() {
-    micIcon.classList.remove('recording');
-    startBtn.innerText = "음성 인식 시작";
-    statusText.innerText = "인식 중지됨";
-}
+        }
     </script>
 </body>
 </html>
