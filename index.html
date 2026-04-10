@@ -3,95 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visible ARS Voice Test</title>
+    <title>Visible ARS - Voice Interaction</title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f7f6; }
-        #result-box { width: 90%; min-height: 150px; margin: 20px auto; padding: 15px; border-radius: 10px; background: #fff; border: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-size: 1.2rem; }
-        .btn { padding: 15px 30px; font-size: 1rem; color: white; border: none; border-radius: 50px; cursor: pointer; transition: 0.3s; }
-        #start-btn { background-color: #4CAF50; }
-        #start-btn.recording { background-color: #f44336; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-        .status { margin-top: 10px; color: #666; font-size: 0.9rem; }
+        body { font-family: 'Pretendard', sans-serif; text-align: center; padding: 0; margin: 0; background: #f8f9fa; }
+        .container { max-width: 500px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        
+        /* 시작 레이어 */
+        #welcome-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .start-btn { padding: 20px 40px; font-size: 1.5rem; font-weight: bold; color: white; background: #007bff; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,123,255,0.3); }
+        
+        /* 메인 ARS 화면 */
+        #ars-screen { display: none; width: 100%; }
+        #result-box { width: 100%; min-height: 200px; margin-bottom: 20px; padding: 20px; border-radius: 15px; background: #fff; border: 2px solid #e9ecef; box-shadow: 0 10px 25px rgba(0,0,0,0.05); font-size: 1.3rem; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }
+        
+        .mic-indicator { width: 60px; height: 60px; border-radius: 50%; background: #ff4757; display: inline-flex; justify-content: center; align-items: center; margin-bottom: 10px; transition: 0.3s; }
+        .recording { animation: pulse 1.5s infinite; }
+        
+        @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); } 70% { transform: scale(1.1); box-shadow: 0 0 0 15px rgba(255, 71, 87, 0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); } }
+        .guide-text { color: #6c757d; font-size: 1rem; margin-top: 15px; }
     </style>
 </head>
 <body>
-    <h2>보이는 ARS 음성 인식</h2>
-    <div id="result-box">아래 버튼을 누르고 말씀하세요...</div>
-    <button id="start-btn" class="btn">음성 인식 시작</button>
-    <p id="status-text" class="status">대기 중</p>
+
+    <div id="welcome-layer">
+        <h2 style="margin-bottom: 30px;">보이는 ARS를 시작합니다</h2>
+        <button id="entry-btn" class="start-btn">ARS 서비스 시작</button>
+        <p class="guide-text">원활한 상담을 위해 마이크 권한을 허용해 주세요.</p>
+    </div>
+
+    <div class="container" id="ars-screen">
+        <div class="mic-indicator" id="mic-icon">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="white"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+        </div>
+        <div id="result-box">
+            <span id="transcript-final" style="color: #212529; font-weight: bold;"></span>
+            <span id="transcript-interim" style="color: #adb5bd;">듣고 있습니다...</span>
+        </div>
+        <p id="status-text" class="guide-text">무엇을 도와드릴까요? 상담 내용을 말씀하세요.</p>
+    </div>
 
     <script>
-        const startBtn = document.getElementById('start-btn');
-        const resultBox = document.getElementById('result-box');
-        const statusText = document.getElementById('status-text');
+        const entryBtn = document.getElementById('entry-btn');
+        const welcomeLayer = document.getElementById('welcome-layer');
+        const arsScreen = document.getElementById('ars-screen');
+        const micIcon = document.getElementById('mic-icon');
+        const transcriptFinal = document.getElementById('transcript-final');
+        const transcriptInterim = document.getElementById('transcript-interim');
 
-        // 브라우저 호환성 체크
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         if (!SpeechRecognition) {
-            resultBox.innerText = "이 브라우저는 음성 인식을 지원하지 않습니다. 크롬을 사용해 주세요.";
-            startBtn.disabled = true;
+            alert("이 브라우저는 음성 인식을 지원하지 않습니다. 안드로이드 크롬을 이용해 주세요.");
         } else {
             const recognition = new SpeechRecognition();
             recognition.lang = 'ko-KR';
-            recognition.interimResults = true; // 말하는 도중에도 결과 표시
-            recognition.continuous = false;   // 한 문장이 끝나면 중지
+            recognition.interimResults = true;
+            recognition.continuous = false; // 한 문장씩 정확하게 처리
 
-            let isRecording = false;
-
-            startBtn.onclick = () => {
-                if (!isRecording) {
-                    recognition.start();
-                } else {
-                    recognition.stop();
-                }
+            // [핵심] 서비스 시작 버튼 클릭 시 실행
+            entryBtn.onclick = () => {
+                welcomeLayer.style.display = 'none';
+                arsScreen.style.display = 'block';
+                recognition.start(); // 여기서 팝업이 뜸
             };
 
             recognition.onstart = () => {
-                isRecording = true;
-                startBtn.innerText = "인식 중... (멈추려면 클릭)";
-                startBtn.classList.add('recording');
-                statusText.innerText = "마이크 활성화됨";
+                micIcon.classList.add('recording');
+                transcriptInterim.innerText = "듣고 있습니다...";
             };
 
             recognition.onresult = (event) => {
-                let interimTranscript = '';
-                let finalTranscript = '';
+                let interim = '';
+                let final = '';
 
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                     if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript;
+                        final += event.results[i][0].transcript;
                     } else {
-                        interimTranscript += event.results[i][0].transcript;
-                    }
-                }
-                
-                // 실시간으로 결과 출력
-                resultBox.innerHTML = `<strong>최종:</strong> ${finalTranscript}<br><span style="color:#999">인식중: ${interimTranscript}</span>`;
-                
-                if (finalTranscript) {
-                    console.log("서버로 전송할 값:", finalTranscript);
-                    // 여기서 fetch 등을 이용해 ARS 서버로 전송 가능
-                }
-            };
-
-            recognition.onerror = (event) => {
-                console.error("오류 발생:", event.error);
-                statusText.innerText = "오류: " + event.error;
-                stopRecording();
-            };
-
-            recognition.onend = () => {
-                stopRecording();
-            };
-
-            function stopRecording() {
-                isRecording = false;
-                startBtn.innerText = "음성 인식 시작";
-                startBtn.classList.remove('recording');
-                statusText.innerText = "인식 종료";
-            }
-        }
-    </script>
-</body>
-</html>
+                        interim += event
