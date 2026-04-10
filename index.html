@@ -80,4 +80,31 @@
                     if (event.results[i].isFinal) {
                         final += event.results[i][0].transcript;
                     } else {
-                        interim += event
+                        interim += event.results[i][0].transcript;
+                    }
+                }
+
+                if (final) {
+                    transcriptFinal.innerText = final;
+                    console.log("인식된 핵심어 처리 로직 호출:", final);
+                    // 여기서 KoNLPy 서버 등으로 데이터를 보낼 수 있습니다.
+                }
+                transcriptInterim.innerText = interim;
+            };
+
+            // [핵심] 인식이 끝나면 자동으로 다시 켜기
+            recognition.onend = () => {
+                console.log("자동 재시작...");
+                recognition.start(); 
+            };
+
+            recognition.onerror = (event) => {
+                console.error("오류:", event.error);
+                if(event.error === 'not-allowed') {
+                    alert("마이크 권한이 거부되었습니다. 설정에서 허용해 주세요.");
+                }
+            };
+        }
+    </script>
+</body>
+</html>
